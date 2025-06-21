@@ -39,7 +39,7 @@ router.get("/categoryItems/:categoryId", async (req, res) => {
 
 router.post("/", upload.single("image"), async (req, res) => {
   try {
-    const { name, categoryId, buyPrice, sellPrice } = req.body;
+    const { name, categoryId, buyPrice, sellPrice,quantity } = req.body;
     const image = req.file ? req.file.path : "";
 
     const newProduct = new Product({
@@ -48,6 +48,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       buyPrice,
       sellPrice,
       image,
+      quantity
     });
 
     await newProduct.save();
