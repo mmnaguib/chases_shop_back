@@ -33,6 +33,65 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.get("/by-user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const invoices = await Invoice.find({ userId })
+      .populate("userId", "name phone")
+      .populate("items.productId", "name")
+      .sort({ date: -1 });
+
+    res.status(200).json(invoices);
+  } catch (error) {
+    console.error("Error fetching invoices by user:", error);
+    res.status(500).json({ message: "حدث خطأ أثناء جلب الفواتير" });
+  }
+});
+
+router.post('/:id/pay', async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) return res.status(404).json({ message: 'فاتورة غير موجودة' });
+
+    const localPayments = req.body.localPayments;
+
+    if (!Array.isArray(localPayments) || localPayments.length === 0) {
+      return res.status(400).json({ message: 'الدفعات غير موجودة أو غير صالحة' });
+    }
+
+    // حساب المدفوع الجديد
+    const newPaid = localPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    // المدفوع سابقًا
+    const previouslyPaid = invoice.paymentMethods.reduce((sum, p) => sum + p.amount, 0);
+
+    const totalAfter = previouslyPaid + newPaid;
+
+    if (totalAfter > invoice.finalPrice) {
+      return res
+        .status(400)
+        .json({ message: 'إجمالي المدفوع أكبر من قيمة الفاتورة' });
+    }
+
+    // أضف الدفعات الجديدة
+    invoice.paymentMethods.push(...localPayments);
+
+    // عدّل الباقي
+    invoice.remaining = invoice.finalPrice - totalAfter;
+    invoice.totalPrice = totalAfter
+    await invoice.save();
+    res.json(invoice);
+  } catch (err) {
+    console.error('Error paying invoice:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
+
+
+
 router.post("/", async (req, res) => {
   try {
     const { type, items } = req.body;
