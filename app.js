@@ -21,8 +21,12 @@ app.get("/", (req, res) => {
 
 const productRoutes = require("./routes/products");
 const categoriesRoutes = require("./routes/category");
+const usersRoutes = require("./routes/user");
+const invoiceRoutes = require("./routes/invoice");
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoriesRoutes);
+app.use("/api/users", usersRoutes);
+app.use("/api/invoices", invoiceRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
