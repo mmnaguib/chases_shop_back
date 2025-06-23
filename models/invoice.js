@@ -34,6 +34,10 @@ const invoiceSchema = new mongoose.Schema({
         type: Number,
         required: true,
       },
+      buyPrice: {
+        type: Number,
+        required: true,
+      },
     },
   ],
   totalPrice: {
@@ -69,7 +73,10 @@ const invoiceSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-
+  adminExpenses: {
+    type: Number,
+    default: 0,
+  },
 });
 
 module.exports = mongoose.model("Invoice", invoiceSchema);
