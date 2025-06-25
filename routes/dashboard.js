@@ -40,54 +40,137 @@ router.get("/invoices-count", async (req, res) => {
 
 router.get("/total-sold", async (req, res) => {
   try {
-    const invoices = await Invoice.find({ type: "S" });
+    const invoices = await Invoice.find();
 
     let totalQuantity = 0;
-    let totalRevenue = 0; // المبلغ المدفوع فقط (كاش أو دفعة أولى)
+    let totalRevenue = 0;
     let totalProfit = 0;
 
-    let totalFinalPrice = 0; // كل الفواتير بدون خصم
+    let totalFinalPrice = 0;
     let totalRemaining = 0;
     let totalPaid = 0;
     let adminExpenses = 0;
-    invoices.forEach((invoice) => {
+    let totalPurchaseRemaining = 0;
+
+    const productSalesMap = {};
+    const productPurchaseMap = {};
+
+    let totalPurchasedQuantity = 0;
+    let totalPurchaseCost = 0;
+
+    for (const invoice of invoices) {
       const invoiceFinal = invoice.finalPrice || 0;
       const invoiceRemaining = invoice.remaining || 0;
       const invoicePaid = invoiceFinal - invoiceRemaining;
 
       totalFinalPrice += invoiceFinal;
-      totalRemaining += invoiceRemaining;
-      totalPaid += invoicePaid;
+      //totalRemaining += invoiceRemaining;
 
       invoice.items.forEach((item) => {
         const quantity = item.quantity || 0;
         const unitPrice = item.unitPrice || 0;
         const buyPrice = item.buyPrice || 0;
+        const productId = item.productId?.toString();
+        if (invoice.type === "S") {
+          // إجمالي الكمية
+          totalQuantity += quantity;
 
-        totalQuantity += quantity;
-        totalProfit += quantity * (unitPrice - buyPrice);
+          // إجمالي الربح
+          totalProfit += quantity * (unitPrice - buyPrice);
+
+          // إجمالي المبيعات النظرية (البيع × الكمية)
+          totalRevenue += quantity * unitPrice;
+
+          // إجمالي المدفوع فعليًا
+          totalPaid += invoicePaid;
+
+          // حفظ الكميات المباعة لكل منتج
+          if (productId) {
+            productSalesMap[productId] =
+              (productSalesMap[productId] || 0) + quantity;
+          }
+
+          // المصاريف الإدارية
+          adminExpenses += invoice.adminExpenses || 0;
+        }
+
+        if (invoice.type === "P") {
+          // إجمالي الكمية المشتراة
+          totalPurchasedQuantity += quantity;
+
+          // إجمالي التكلفة
+          totalPurchaseCost += quantity * buyPrice;
+
+          // الكميات المشتراة لكل منتج
+          if (productId) {
+            productPurchaseMap[productId] =
+              (productPurchaseMap[productId] || 0) + quantity;
+          }
+        }
       });
+    }
 
-      totalRevenue += invoicePaid;
-      adminExpenses += invoice.adminExpenses || 0;
-    });
     const netProfit = totalProfit - adminExpenses;
+
+    // جلب أسماء المنتجات المباعة
+    const topProducts = await Promise.all(
+      Object.entries(productSalesMap).map(async ([productId, quantity]) => {
+        const product = await Product.findById(productId);
+        return product
+          ? {
+              name: product.name,
+              quantity,
+              remainingStock: product.quantity || 0,
+            }
+          : null;
+      })
+    );
+
+    // جلب أسماء المنتجات المشتراة
+    const purchasedProducts = await Promise.all(
+      Object.entries(productPurchaseMap).map(async ([productId, quantity]) => {
+        const product = await Product.findById(productId);
+        return product
+          ? {
+              name: product.name,
+              quantity,
+            }
+          : null;
+      })
+    );
+
+    invoices.forEach((invoice) => {
+      if (invoice.type === "S") {
+        totalRemaining += invoice.remaining || 0; // ده المبلغ اللي ليك
+      } else if (invoice.type === "P") {
+        totalPurchaseRemaining += invoice.remaining || 0; // ده المبلغ اللي عليك
+      }
+    });
 
     res.json({
       totalQuantity,
       totalRevenue,
+      totalPaid,
       totalProfit,
       totalFinalPrice,
-      totalPaid,
-      totalRemaining,
+      totalRemaining, // اللي ليك من العملاء
+      totalPurchaseRemaining, // اللي عليك للموردين
       netProfit,
       adminExpenses,
+      topProducts: topProducts.filter(Boolean),
+      purchasedProducts: purchasedProducts.filter(Boolean),
+      totalPurchasedQuantity,
+      totalPurchaseCost,
     });
   } catch (error) {
-    console.error("خطأ في حساب المبيعات:", error);
-    res.status(500).json({ error: "فشل في حساب المبيعات" });
+    console.error("خطأ في حساب البيانات:", error);
+    res.status(500).json({ error: "فشل في حساب البيانات" });
   }
 });
+
+module.exports = router;
+
+module.exports = router;
 
 router.get("/monthly-profit", async (req, res) => {
   try {
