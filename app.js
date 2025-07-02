@@ -24,6 +24,9 @@ const categoriesRoutes = require("./routes/category");
 const usersRoutes = require("./routes/user");
 const invoiceRoutes = require("./routes/invoice");
 const dashboardRoutes = require("./routes/dashboard");
+const authRoutes = require("./routes/auth");
+
+app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/users", usersRoutes);
